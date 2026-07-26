@@ -29,18 +29,18 @@ ultimo_evento_botao_ms = 0
 
 def ler_lux():
     GAMMA = 0.7
-    RL10 = 50       # kilo-ohms
-    R_FIXO = 10000  # ohms (resistor interno do modulo)
+    RL10 = 50
+    R_FIXO = 10000
     VCC = 3.3
 
-    valor_bruto = ldr.read()  # 0 - 4095 (ADC de 12 bits do ESP32)
+    valor_bruto = ldr.read()
     if valor_bruto <= 0:
-        valor_bruto = 1  # evita divisao por zero em condicao extrema
+        valor_bruto = 1
 
     v_ao = (valor_bruto / 4095) * VCC
 
     if v_ao >= VCC:
-        v_ao = VCC - 0.001  # evita divisao por zero quando totalmente claro
+        v_ao = VCC - 0.001
 
     r_ldr = R_FIXO * (VCC - v_ao) / v_ao
     lux = 10 * (r_ldr / (RL10 * 1000)) ** (-1 / GAMMA)
@@ -97,7 +97,7 @@ def processar_sensor_lux():
         else:
             if inicio_bloqueio_ms is not None and not alerta_microparada_emitido:
                 duracao_bloqueio = time.ticks_diff(agora, inicio_bloqueio_ms)
-                if duracao_bloqueio > MICROPARADA_LIMIAR_MS:
+                if duracao_bloqueio >= MICROPARADA_LIMIAR_MS:
                     print("Alerta: Micro-parada detectada!")
                     alerta_microparada_emitido = True
 
@@ -112,4 +112,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()print("Sistema Kanban Inicializado")
+    main()
