@@ -25,6 +25,7 @@ alerta_microparada_emitido = False
 
 estado_botao_anterior = 0
 ultimo_evento_botao_ms = 0
+botao_evento_processado = True
 
 
 def ler_ldr_bruto():
@@ -43,18 +44,22 @@ def resetar_turno():
 
 
 def processar_botao_reset():
-    global estado_botao_anterior, ultimo_evento_botao_ms
+    global estado_botao_anterior, ultimo_evento_botao_ms, botao_evento_processado
 
     agora = time.ticks_ms()
     leitura_atual = btn.value()
 
     if leitura_atual != estado_botao_anterior:
-        if time.ticks_diff(agora, ultimo_evento_botao_ms) > DEBOUNCE_MS:
-            ultimo_evento_botao_ms = agora
-            estado_botao_anterior = leitura_atual
+        ultimo_evento_botao_ms = agora
+        estado_botao_anterior = leitura_atual
 
-            if leitura_atual == 1:
+    if time.ticks_diff(agora, ultimo_evento_botao_ms) >= DEBOUNCE_MS:
+        if not botao_evento_processado:
+            botao_evento_processado = True
+            if estado_botao_anterior == 1:
                 resetar_turno()
+    else:
+        botao_evento_processado = False
 
 
 def processar_sensor_lux():
