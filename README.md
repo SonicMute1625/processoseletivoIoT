@@ -274,71 +274,105 @@ Preencha todas as seções abaixo de forma **clara, objetiva e técnica**.
 
 ### Identificação do Candidato
 
-- **Nome completo:**
-- **GitHub:**
+- **Nome completo: Luiz Felipe Miranda de Souza**
+- **GitHub:https://github.com/SonicMute1625 **
 
 ---
 
 ## Visão Geral da Solução
 
-Descreva, em poucas palavras:
+O objetivo deste projeto é simular um contador de produção não-intrusivo para linhas de montagem manuais ou semiautomáticas que operam sem CLP.
+O sistema embarcado simulado monitora a passagem de peças em uma esteira através de um sensor óptico (LDR), incrementando um contador de produção a cada peça detectada, calculando o tempo de ciclo entre peças e identificando micro-paradas na linha (quando a esteira fica travada por tempo excessivo).
 
-- Qual é o objetivo do seu projeto
-- O que o sistema embarcado simulado faz
-- Como o usuário interage com ele (se aplicável)
+O usuário (operador da linha) interage com o sistema através de um botão físico, que permite resetar o turno a qualquer momento, zerando o contador e os cronômetros acumulados.
+Toda a telemetria e os alertas são reportados via comunicação Serial.
 
 ---
 
 ## Arquitetura do Sistema Embarcado
 
-Explique a arquitetura lógica do seu projeto, abordando:
+O firmware (src/main.py) é organizado como uma máquina de estados não-bloqueante, executada em um loop principal que roda indefinidamente sem nenhuma chamada bloqueante longa (sleep), garantindo que o sistema nunca perca uma janela de estímulo dos sensores.
 
-- Fluxo principal do programa (`main.py`)
-- Estrutura de estados, loops ou temporizações
-- Como os componentes interagem entre si
+Fluxo principal (main()):
 
-Se desejar, utilize tópicos ou um pequeno diagrama em texto.
+Inicializacao -> imprime mensagem de boot
+loop infinito:
+    processar_sensor_lux()    -> maquina de estados da esteira
+    processar_botao_reset()   -> leitura debounced do botao
+    pequena pausa de polling (10ms, nao bloqueante)
+
+Estrutura de estados da esteira (processar_sensor_lux):
+
+LIVRE: estado de repouso, sensor detecta luz (linha desobstruída)
+BLOQUEADO: peça obstruindo o feixe de luz
+
+Transições:
+
+LIVRE → BLOQUEADO: início da passagem de uma peça (marca o instante inicial do bloqueio)
+BLOQUEADO → LIVRE: peça passou completamente → incrementa o contador de produção
+Permanência prolongada em BLOQUEADO (> 5s): dispara alerta de micro-parada (uma única vez por evento)
+
+Temporização: toda a lógica de tempo (duração do bloqueio, debounce do botão) usa time.ticks_ms() e time.ticks_diff(), que lidam corretamente com overflow do contador de ticks, mais seguro que subtração direta de timestamps.
+
+Interação entre componentes: o sensor LDR e o botão são lidos de forma independente a cada iteração do loop; o botão pode resetar o estado da esteira a qualquer momento, inclusive no meio de um bloqueio em andamento.
 
 ---
 
 ## Componentes Utilizados na Simulação
 
-Liste os principais componentes definidos no `diagram.json`, por exemplo:
+Placa: ESP32 DevKit C v4
 
-- Tipo de placa utilizada
-- LEDs, botões, sensores, atuadores, etc.
-- Função de cada componente no sistema
+Sensor óptico (LDR): módulo de 4 pinos (VCC, GND, DO, AO), identificado como ldr1 no diagram.json.
+Função: detectar a interrupção do feixe de luz pela passagem de peças na esteira, através da leitura analógica (AO) conectada ao ADC do ESP32.
+
+Botão (btn1): botão de reset manual do turno, ligado ao pino digital D15 com pull-down interno do ESP32.
+Função: permitir ao operador zerar contadores e cronômetros a qualquer momento.
+
+Interface Serial (UART): usada para reportar todos os eventos (inicialização, contagem, alertas, reset) em texto legível.
+
+Componente	  Pino do componente	Pino do ESP32
+LDR (ldr1)	  VCC	                3V3
+LDR (ldr1)	  GND	                GND
+LDR (ldr1)	  AO	                D34 (ADC)
+Botão (btn1)	1.l	                3V3
+Botão (btn1)	2.l	                GND
+Botão (btn1)	2.r	                D15
 
 ---
 
 ## Decisões Técnicas Relevantes
 
-Explique brevemente decisões importantes tomadas durante o desenvolvimento, como:
+Organização do código: o firmware é dividido em funções de responsabilidade única (ler_ldr_bruto, resetar_turno, processar_botao_reset, processar_sensor_lux), facilitando leitura e manutenção. Constantes de configuração (limiares, pinos, tempos) ficam centralizadas no topo do arquivo.
 
-- Organização do código
-- Uso de funções, estados ou constantes
-- Estratégias para temporização ou controle lógico
+Estados explícitos em vez de flags soltas: o estado da esteira é representado por uma variável de string ("LIVRE" / "BLOQUEADO"), tornando a lógica de transições mais legível do que múltiplas variáveis booleanas.
+
+Leitura do LDR em ADC bruto, não em lux reconstruído: a primeira versão do firmware tentava reconstruir o valor de "lux" a partir da tensão do ADC, usando a fórmula teórica do datasheet do componente (parâmetros gamma e rl10).
+Essa abordagem se mostrou pouco confiável: uma calibração empírica (leitura direta do ADC em diferentes valores de lux configurados no simulador) revelou que a relação real do componente simulado é inversa à esperada pela fórmula teórica, causando falsos positivos de bloqueio.
+A solução final compara diretamente o valor bruto do ADC (0–4095) contra dois limiares calibrados empiricamente (claro/escuro), eliminando a dependência de uma fórmula sensível a erros de calibração.
+
+Debounce por estabilidade contínua: o componente wokwi-pushbutton usado no diagram.json tem o atributo bounce ativado, simulando o ricochete mecânico real de um botão físico.
+O debounce do firmware não dispara na primeira mudança de nível após um intervalo mínimo, em vez disso, exige que o pino permaneça estável no novo nível por um período contínuo antes de considerar o evento válido, filtrando o ricochete simulado.
+
+Alerta de micro-parada único por evento: uma flag (alerta_microparada_emitido) evita que o alerta seja reimpresso repetidamente enquanto a condição de bloqueio prolongado persiste, disparando a mensagem apenas uma vez por ocorrência.
 
 ---
 
 ## Resultados Obtidos
 
-Descreva o comportamento final do sistema:
+Cenário testado	Resultado
+test_1 — Contagem Normal de Peças	✅ Passou
+test_2 — Detecção de Micro-parada na Esteira	✅ Passou
+test_3 — Reset Manual de Turno	❌ Falhou (timeout na simulação)
 
-- O que funciona corretamente
-- Quais requisitos foram atendidos
-- Resultado observado na simulação do Wokwi
+O sistema atende corretamente aos requisitos de inicialização, contagem de peças (com transição de borda para evitar contagem duplicada) e detecção de micro-parada (limiar de 5 segundos).
+O reset manual de turno também funciona do ponto de vista funcional, a mensagem "Turno resetado com sucesso. Contadores zerados." é emitida corretamente no momento esperado, porém a simulação automatizada do test_3 não finaliza dentro do tempo limite (10000ms) definido pelo Wokwi CI, resultando em falha do pipeline por timeout mesmo com o comportamento do firmware correto.
+Os testes manuais no Wokwi funcionaram sem nenhum problema.
 
 ---
 
 ## Comentários Adicionais (Opcional)
 
-Utilize este espaço para comentar, se desejar:
 
-- Dificuldades encontradas
-- Limitações da solução
-- Melhorias que você faria com mais tempo
-- Principais aprendizados durante o desafio
 
 ---
 
