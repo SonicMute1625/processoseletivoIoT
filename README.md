@@ -275,7 +275,7 @@ Preencha todas as seções abaixo de forma **clara, objetiva e técnica**.
 ### Identificação do Candidato
 
 - **Nome completo: Luiz Felipe Miranda de Souza**
-- **GitHub:https://github.com/SonicMute1625 **
+- **GitHub: https://github.com/SonicMute1625 **
 
 ---
 
@@ -360,9 +360,9 @@ Alerta de micro-parada único por evento: uma flag (alerta_microparada_emitido) 
 ## Resultados Obtidos
 
 Cenário testado	Resultado
-test_1 — Contagem Normal de Peças	✅ Passou
-test_2 — Detecção de Micro-parada na Esteira	✅ Passou
-test_3 — Reset Manual de Turno	❌ Falhou (timeout na simulação)
+test_1 —> Contagem Normal de Peças	✅ Passou
+test_2 —> Detecção de Micro-parada na Esteira	✅ Passou
+test_3 —> Reset Manual de Turno	❌ Falhou (timeout na simulação)
 
 O sistema atende corretamente aos requisitos de inicialização, contagem de peças (com transição de borda para evitar contagem duplicada) e detecção de micro-parada (limiar de 5 segundos).
 O reset manual de turno também funciona do ponto de vista funcional, a mensagem "Turno resetado com sucesso. Contadores zerados." é emitida corretamente no momento esperado, porém a simulação automatizada do test_3 não finaliza dentro do tempo limite (10000ms) definido pelo Wokwi CI, resultando em falha do pipeline por timeout mesmo com o comportamento do firmware correto.
