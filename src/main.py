@@ -4,8 +4,8 @@ import time
 LDR_PIN = 34
 BTN_PIN = 15
 
-LUX_LIVRE_LIMIAR = 500
-LUX_BLOQUEIO_LIMIAR = 100
+ADC_LIMIAR_CLARO = 1470
+ADC_LIMIAR_ESCURO = 2414
 
 MICROPARADA_LIMIAR_MS = 5000
 DEBOUNCE_MS = 50
@@ -27,25 +27,8 @@ estado_botao_anterior = 0
 ultimo_evento_botao_ms = 0
 
 
-def ler_lux():
-    GAMMA = 0.7
-    RL10 = 50
-    R_FIXO = 10000
-    VCC = 3.3
-
-    valor_bruto = ldr.read()
-    if valor_bruto <= 0:
-        valor_bruto = 1
-
-    v_ao = (valor_bruto / 4095) * VCC
-
-    if v_ao >= VCC:
-        v_ao = VCC - 0.001
-
-    r_ldr = R_FIXO * (VCC - v_ao) / v_ao
-    lux = 10 * (r_ldr / (RL10 * 1000)) ** (-1 / GAMMA)
-
-    return lux
+def ler_ldr_bruto():
+    return ldr.read()
 
 
 def resetar_turno():
@@ -77,17 +60,17 @@ def processar_botao_reset():
 def processar_sensor_lux():
     global estado_esteira, total_pecas, inicio_bloqueio_ms, alerta_microparada_emitido
 
-    lux = ler_lux()
+    valor_adc = ler_ldr_bruto()
     agora = time.ticks_ms()
 
     if estado_esteira == "LIVRE":
-        if lux < LUX_BLOQUEIO_LIMIAR:
+        if valor_adc > ADC_LIMIAR_ESCURO:
             estado_esteira = "BLOQUEADO"
             inicio_bloqueio_ms = agora
             alerta_microparada_emitido = False
 
     elif estado_esteira == "BLOQUEADO":
-        if lux > LUX_LIVRE_LIMIAR:
+        if valor_adc < ADC_LIMIAR_CLARO:
             total_pecas += 1
             print("Peca detectada! Total: {}".format(total_pecas))
 
